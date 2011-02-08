@@ -13,11 +13,11 @@ Raphael.fn.g.piechart = function (cx, cy, r, values, opts) {
         series = this.set(),
         order = [],
         len = values.length,
-        angle = 0,
+        angle = 90,
         total = 0,
         others = 0,
-        cut = 9,
-        defcut = true;
+        cut = opts.cut || values.length,
+        defcut = opts.defcut;
     chart.covers = covers;
     if (len == 1) {
         series.push(this.circle(cx, cy, r).attr({fill: this.g.colors[0], stroke: opts.stroke || "#fff", "stroke-width": opts.strokewidth == null ? 1 : opts.strokewidth}));
@@ -25,7 +25,7 @@ Raphael.fn.g.piechart = function (cx, cy, r, values, opts) {
         total = values[0];
         values[0] = {value: values[0], order: 0, valueOf: function () { return this.value; }};
         series[0].middle = {x: cx, y: cy};
-        series[0].mangle = 180;
+        series[0].mangle = 0;
     } else {
         function sector(cx, cy, r, startAngle, endAngle, fill) {
             var rad = Math.PI / 180,
@@ -43,9 +43,11 @@ Raphael.fn.g.piechart = function (cx, cy, r, values, opts) {
             total += values[i];
             values[i] = {value: values[i], order: i, valueOf: function () { return this.value; }};
         }
-        values.sort(function (a, b) {
+        if (opts.sort) {
+          values.sort(function (a, b) {
             return b.value - a.value;
-        });
+          });
+        }
         for (i = 0; i < len; i++) {
             if (defcut && values[i] * 360 / total <= 1.5) {
                 cut = i;
@@ -61,13 +63,11 @@ Raphael.fn.g.piechart = function (cx, cy, r, values, opts) {
         len = Math.min(cut + 1, values.length);
         others && values.splice(len) && (values[cut].others = true);
         for (i = 0; i < len; i++) {
-            var mangle = angle - 360 * values[i] / total / 2;
-            if (!i) {
-                angle = 90 - mangle;
-                mangle = angle - 360 * values[i] / total / 2;
-            }
+            var startAngle = angle + 360 * values[i] / total;
+            var endAngle = startAngle + 360 * values[i + 1] / total;
+            mangle = (endAngle - startAngle) / 2.0;
             if (opts.init) {
-                var ipath = sector(cx, cy, 1, angle, angle - 360 * values[i] / total).join(",");
+                var ipath = sector(cx, cy, 1, startAngle, endAngle).join(",");
             }
             var path = sector(cx, cy, r, angle, angle -= 360 * values[i] / total);
             var p = this.path(opts.init ? ipath : path).attr({fill: opts.colors && opts.colors[i] || this.g.colors[i] || "#666", stroke: opts.stroke || "#fff", "stroke-width": (opts.strokewidth == null ? 1 : opts.strokewidth), "stroke-linejoin": "round"});
