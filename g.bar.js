@@ -8,6 +8,7 @@ Raphael.fn.g.barchart = function (x, y, width, height, values, opts) {
     opts = opts || {};
     var type = {round: "round", sharp: "sharp", soft: "soft"}[opts.type] || "square",
         gutter = parseFloat(opts.gutter || "20%"),
+        yScale = 0.9,
         chart = this.set(),
         bars = this.set(),
         covers = this.set(),
@@ -47,16 +48,71 @@ Raphael.fn.g.barchart = function (x, y, width, height, values, opts) {
     }
     
     total = (opts.to) || total;
+    if (total == 0.0)
+      total = 100;
+
     var barwidth = width / (len * (100 + gutter) + gutter) * 100,
         barhgutter = barwidth * gutter / 100,
         barvgutter = opts.vgutter == null ? 20 : opts.vgutter,
         stack = [],
         X = x + barhgutter,
-        Y = (height - 2 * barvgutter) / total;
+        Y = (height - 2 * barvgutter) / total * yScale,
+        gridLabels = [],
+        gridLabelWidths = [];
+
+    // Labels for Y-axis and grid
+    if (opts.grid && opts.grid.labels) {
+      var gridLabels = [];
+      for (var i = 0; i < 4; i++) {
+        var v = (total / yScale) * (i + 1) / 5.0;
+        var text = this.text(x, y + height - v * Y, Number(v).toFixed(1));
+        gridLabels.push(text);
+        gridLabelWidths.push(text.getBBox().width);
+
+        if (opts.textColor)
+          text.attr({ fill : opts.textColor });
+      }
+
+      var maxGridLabelWidth = Math.max.apply(Math, gridLabelWidths);
+      width -= maxGridLabelWidth;
+      x += maxGridLabelWidth;
+      barwidth = width / (len * (100 + gutter) + gutter) * 100;
+      barhgutter = barwidth * gutter / 100;
+      X = x + barhgutter;
+    }
+
+    // Border
+    if (opts.border) {
+      this.rect(x, y, width, height).attr({ stroke : opts.border.stroke,
+                                            "stroke-width" : opts.border.strokeWidth });
+    }
+
+    // Background
+    if (opts.background) {
+      this.rect(x, y, width, height).attr({ fill : opts.background.fill,
+                                            "stroke-width" : 0 });
+    }
+
+    // Labels for Y-axis and grid, continued
+    if (opts.grid) {
+      for (var i = 0; i < 4; i++) {
+        var v = total * (i + 1) / 5.0;
+
+        if (opts.grid.labels) {
+          var text = gridLabels[i];
+          text.translate(maxGridLabelWidth - text.getBBox().width * 0.5 - 10, 0);
+        }
+
+        var line = this.path("M " + x + "," + (y + height - v * Y / yScale) + "L " + (x + width) + "," + (y + height - v * Y / yScale));
+        line.attr({ "stroke" : opts.grid.stroke });
+      }
+    }
+
     if (!opts.stretch) {
         barhgutter = Math.round(barhgutter);
         barwidth = Math.floor(barwidth);
     }
+
     !opts.stacked && (barwidth /= multi || 1);
     for (var i = 0; i < len; i++) {
         stack = [];
@@ -101,6 +157,12 @@ Raphael.fn.g.barchart = function (x, y, width, height, values, opts) {
                 cover.bar = bar;
                 cover.value = bar.value;
                 size += bar.value;
+
+                if (opts.axisLabels && s == 0) {
+                  var label = this.text(bar.x, bar.y + bar.value * Y + 12, opts.axisLabels[i]);
+                  if (opts.textColor)
+                    label.attr({ fill : opts.textColor });
+                }
             }
             X += barwidth;
         }
@@ -120,6 +182,7 @@ Raphael.fn.g.barchart = function (x, y, width, height, values, opts) {
             X += barhgutter;
         }
     }
+
     chart.label = function (labels, isBottom) {
         labels = labels || [];
         this.labels = paper.set();
